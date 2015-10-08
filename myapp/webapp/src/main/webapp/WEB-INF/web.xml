@@ -173,6 +173,7 @@
     - config specific to the wicket-viewer
     -
     -->
+    <!--
     <filter>
         <filter-name>WicketFilter</filter-name>
         <filter-class>org.apache.wicket.protocol.http.WicketFilter</filter-class>
@@ -185,7 +186,7 @@
         <filter-name>WicketFilter</filter-name>
         <url-pattern>/wicket/*</url-pattern>
     </filter-mapping>
-
+    -->
 
     <context-param>
         <param-name>configuration</param-name>
@@ -205,7 +206,8 @@
     <!--
     THE FOLLOWING CONFIGURATION IS NOT REQUIRED IF THE WICKET VIEWER IS IN USE.
     IF THE WICKET VIEWER CONFIGURATION IS REMOVED, THEN UNCOMMENT
-    
+    -->
+
     <listener>
         <listener-class>org.apache.isis.core.webapp.IsisWebAppBootstrapper</listener-class>
     </listener>
@@ -219,8 +221,7 @@
         <param-name>isis.viewers</param-name>
         <param-value>restfulobjects</param-value>
     </context-param>    
-    -->    
-    
+
     <!-- bootstrap the RestEasy framework -->
     <listener>
         <listener-class>org.jboss.resteasy.plugins.server.servlet.ResteasyBootstrap</listener-class>
