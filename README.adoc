@@ -159,7 +159,7 @@ The recovery logic when stuff fails is a bit hairy in the Wicket viewer; hopeful
 
 * under `myapp` folder; import into IntelliJ, set up run configuration: +
 +
-image:https://raw.github.com/isisaddons/isis-app-todoapp/master/images/intellij-runtime-configuration.png[IntelliJ runtime configuration].
+image:https://raw.githubusercontent.com/alejandro-du/vaadin-viewer/master/images/intellij-runtime-configuration.png[IntelliJ runtime configuration].
 
 
 
