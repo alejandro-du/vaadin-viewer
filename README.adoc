@@ -1,3 +1,159 @@
 = Vaadin Viewer for Apache Isis
 
-Just starting out...
+_Notes below are a bit of a "stream-of-consciousness", but hopefully will be useful..._
+
+== A generic viewer's responsibilities
+
+Ultimately an Isis generic viewer needs to be able to render just a handful of things:
+
+* an object +
++
+The domain object can be either a persisted JDO entity or a view model, but actually it doesn't matter from the viewer's perspective). +
+
+* an action prompt +
++
+usually a public method on an object.  Isis supports the concept of "contributed" actions, which are like traits or mix-ins, and ultimately are implemented by domain services.  However, this detail is hidden from viewers... the metamodel makes it appear as if the contributed actions are just regular actions on the domain object. +
++
+we also have the concept of "bulk" actions (`@Action(invokeOn=InvokeOn.COLLECTIONS_ONLY)`), that get invoked on multiple selected objects from a list.  Currently the Wicket viewer only supports bulk actions with no arguments and no validation; I don't think there's anything intrinsic in the Isis metamodel that prevents n-arg bulk actions (taking a prompt).
+
+* a list of objects +
++
+as returned by invoking an action
+
+* a scalar result +
++
+rare, and not particularly helpful, but needs to be handled for an action that returns a simple scalar value such as `int`.
+
+* a void result +
++
+rarer still
+
+* an error page, for rendering stack traces etc when things go wrong
+
+* an about page
+
+In the Wicket viewer these each have a corresponding "page", all of which are subclasses of https://github.com/apache/isis/blob/isis-1.9.0/core/viewer-wicket/ui/src/main/java/org/apache/isis/viewer/wicket/ui/pages/PageAbstract.java[PageAbstract].
+
+
+== Rendering domain objects
+
+Of these, domain objects are, obviously, the most complex.  They consist of: +
+
+** properties +
++
+ie a getter returning a scalar values, either to a value type such as `int` or `DateTime`, or a reference to another domain object (latter rendered as a hyperlink)
+
+** collections +
++
+ie a getter returning a `java.util.Collection` of references to other domain objects.  We call these "parented" collections.  Isis doesn't currently support collections of value types, though these are easily enough to work-around, eg serialize a data structure into JSON or XML and store as a clob.
+
+** actions +
++
+basically all remaining `public` methods (that are not the supporting methods such as `disableXxx ()` or `validateXxx()`, see the http://isis.apache.org/cheat-sheet.html[Isis cheat sheet].
+
+The metamodel allows properties to be grouped into "member groups", and also allows actions to be (optionally) associated with either properties or with collections.  The Wicket viewer uses this info to render the action's buttons close to those features (either below, or to side, etc).
+
+The metamodel also supports the notion of "membergrouplayouts", which is used to determine the number of columns etc.  See the http://isis.apache.org/guides/rg.html#_rg_object-layout[ref guide] for more on this.
+
+
+
+== Metamodel
+
+The main classes of the metamodel are:
+
+* `ObjectSpecification`, analogous to `java.lang.Class`, contains a list of its members
+
+** `ObjectSpecId` is a value type equivalent, derived from `@DomainObject(objectType=...`), eg "CUS" instead of "com.mycompany.Customer".
+
+* `OneToOneAssociation`, represents a property (one of the members of the objectspec)
+
+* `OneToManyAssociation`, represents a (parented) collection
+
+* `ObjectAction`, represents an action
+
+You'll see these last three are all subclasses of `ObjectMember`.
+
+In addition you'll come across `Facet` and `FacetFactory`.  This is the http://www.brockmann-consult.de/beam-wiki/display/BEAM/Extension+Object+Pattern[extension object] pattern, which I learnt about while doing some Eclipse stuff around 2007/8, IIRC.  There's a whole registry of these things, and in sum they consistute the https://github.com/apache/isis/blob/isis-1.9.0/core/metamodel/src/main/java/org/apache/isis/progmodels/dflt/ProgrammingModelFacetsJava5.java[programming model].
+
+From a viewer perspective you can probably ignore these though... they are just where the behaviour/data comes from in the model.
+
+The metamodel exists for the lifetime of the app and is broadly immutable (though this isn't strictly enforced).  Actually, the Wicket viewer - when running in "DEV" mode - always invalidates the `ObjectSpecification` before rendering an object, in order that it is built up dynamically again.  This allows for code-reloading, eg of the elements of the metamodel obtained from the dynamic `Customer.layout.json` files etc.
+
+There are also classes that keep track of the state of individual domain objects as they are brought back from the database (if JDO entities) or if they are new'd up by the framework (if they are view models):
+
+* `ObjectAdapter` == `java.lang.Object` (wraps a domain object), references the corresponding `ObjectSpecification`.
+
+* `RootOid` == (object identifier) is the Isis-assigned identifier for an object, consisting of the object type plus an id, eg "CUS:123".  From this Isis knows which object to recreate and then render.
+
+You'll see the OIDs appear in the Restful Objects viewer URLs/representations and also show up in the Wicket viewer.  The http://isis.apache.org/guides/rg.html#_rg_services-api_manpage-BookmarkService[`BookmarkService`] also basically just serializes them to a string.
+
+
+== Business Rules
+
+When the viewer interacts with any object member, it needs to enforce certain business rules.  These are:
+
+* whether the element should be hidden or visible
+
+* if not hidden, then whether it should be disabled or enabled. +
++
+an enabled action is easy enough to understand.  An enabled property means that there is some means to mnodify the property.  The Wicket viewer does this through an edit mode.  An alternative and equally valid design would be the way that JIRA does it, whereby one clicks into the property to enable it.  An enabled collection means that there is some standard mechanism to add or remove elements.  Although it might look like it, the Wicket viewer doesn't actually support enabled collections, but the work-around is easy enough... just write a pair of actions to do the same.  +
++
+Over time we've found that the concept of enabled properties/collections is less useful for more complex applications where we think that Isis excels ... but obviously having them helps for the simple CRUD starter apps
+
+* if not disabled, then whether the proposed changes are valid. +
++
+For an action that means validating both each action argument individually and also together (eg `startDate` < `endDate`).  For properties it means validating the new value is valid, similarly for collections.
+
+I sometimes summarise these as "see it/use it/do it".
+
+There are lots of ways in which these rules can be expressed in the actual domain object code, eg annotations such as `@RegEx`, supporting methods such as `validateXxx()` and so on.  But again this is all hidden to the viewer.
+
+The low-level "API" to check is https://github.com/apache/isis/blob/isis-1.9.0/core/metamodel/src/main/java/org/apache/isis/core/metamodel/interactions/InteractionUtils.java[`InteractionUtils`].  However, you'll see this is called by `ObjectAction`, `OneToOneAssociation`, `OneToManyAssociation` etc, and these represe
+
+
+
+
+== Some further notes on the Wicket implementation
+
+The Wicket viewer uses a registry of components, following the chain-of-responsibility pattern.  These can be found in https://github.com/apache/isis/blob/isis-1.9.0/core/viewer-wicket/impl/src/main/java/org/apache/isis/viewer/wicket/viewer/registries/components/ComponentFactoryRegistrarDefault.java[`ComponentFactoryRegistrarDefault`].
+
+The API (simplified) is:
+
+[source,java]
+----
+public interface ComponentFactory extends Serializable {
+    public enum ApplicationAdvice {
+        APPLIES, DOES_NOT_APPLY
+    }
+    ApplicationAdvice appliesTo(ComponentType componentType, IModel<?> model);  // <1>
+    Component createComponent(IModel<?> model);
+}
+----
+<1> whether this factory is able to create a component for the specified model, of the provided component type
+
+The "model" here is a Wicket-specific (serializable) representation of element being rendered (either a domain object, or a domain object member, or an action parameter/argument, or...).
+
+If the component factory is able to "does apply", then it will be used to construct the component.
+
+For some components, eg lists of objects, we may have multiple representations... show them in a table, show them on a map, show them as a downloadable excel spreadsheet.  For these, you'll see that Wicket asks for all factories that can render, and puts them in a drop-down.  This is an important feature.
+
+This design has worked well (it was also used by the old DnD viewer that we still use over in Ireland); so it probably makes sense for the Vaadin viewer to take a similar approach.
+
+
+
+== Session management
+
+Each interaction is performed within an `IsisSession`, and within that there is (usually just one) `IsisTransaction`.  In the Wicket viewer this is performed through a callback class (https://github.com/apache/isis/blob/isis-1.9.0/core/viewer-wicket/impl/src/main/java/org/apache/isis/viewer/wicket/viewer/integration/wicket/WebRequestCycleForIsis.java[`WebRequestCycleForIsis`]), but in Restful Objects we have filters to set these up; the vaadin viewer will need the same.
+
+See the http://isis.apache.org/guides/rg.html#_rg_web-xml[ref guide], specifically the bit on http://isis.apache.org/guides/rg.html#_rg_web-xml_filters[filters].
+
+In this repo, see https://github.com/alejandro-du/vaadin-viewer/blob/master/myapp/webapp/src/main/webapp/WEB-INF/web.xml#L243[here] and https://github.com/alejandro-du/vaadin-viewer/blob/master/myapp/webapp/src/main/webapp/WEB-INF/web.xml#L264[here].
+
+The recovery logic when stuff fails is a bit hairy in the Wicket viewer; hopefully the vaadin viewer's will be easier to follow.
+
+
+
+== user story 0: Service menus
+
+ie, the top-menu bar, is provided by the https://github.com/apache/isis/blob/isis-1.9.0/core/viewer-wicket/ui/src/main/java/org/apache/isis/viewer/wicket/ui/components/actionmenu/serviceactions/ServiceActionsPanel.java[`ServiceActionsPanel`], created by ie, the top-menu bar, is provided by the https://github.com/apache/isis/blob/isis-1.9.0/core/viewer-wicket/ui/src/main/java/org/apache/isis/viewer/wicket/ui/components/actionmenu/serviceactions/ServiceActionsPanelFactory.java[`ServiceActionsPanelFactory`]
+
