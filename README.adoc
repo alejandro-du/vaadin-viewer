@@ -153,6 +153,16 @@ The recovery logic when stuff fails is a bit hairy in the Wicket viewer; hopeful
 
 
 
+== running the demo app
+
+* Pull down Isis 1.10.0-SNAPSHOT, and build locally, as per the Isis http://isis.apache.org/guides/cg.html#_cg_building-isis[contributors' guide].
+
+* under `myapp` folder; import into IntelliJ, set up run configuration: +
++
+image:https://raw.github.com/isisaddons/isis-app-todoapp/master/images/intellij-runtime-configuration.png[IntelliJ runtime configuration].
+
+
+
 == user story 0: Service menus
 
 ie, the top-menu bar, is provided by the https://github.com/apache/isis/blob/isis-1.9.0/core/viewer-wicket/ui/src/main/java/org/apache/isis/viewer/wicket/ui/components/actionmenu/serviceactions/ServiceActionsPanel.java[`ServiceActionsPanel`], created by ie, the top-menu bar, is provided by the https://github.com/apache/isis/blob/isis-1.9.0/core/viewer-wicket/ui/src/main/java/org/apache/isis/viewer/wicket/ui/components/actionmenu/serviceactions/ServiceActionsPanelFactory.java[`ServiceActionsPanelFactory`]
